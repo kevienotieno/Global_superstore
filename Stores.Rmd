@@ -1,0 +1,331 @@
+---
+title: "Stores"
+author: "Kevien Otieno"
+date: "2024-02-17"
+output: html_document
+---
+
+```{r}
+#loading packages
+pacman::p_load(tidyverse, tidyr, dplyr, ggplot2,lubridate)
+```
+
+```{r}
+#loading our dataset
+Stores=read.csv("Global Superstore.csv")
+```
+
+```{r}
+#Lets View first 5 rows of our dataset
+head(Stores, 5)
+```
+
+```{r}
+#lets check on the dimensions of our dataset
+dim(Stores)
+```
+
+```{r}
+#list all column names
+names(Stores)
+```
+
+```{r}
+#lets check on the datatypes of our columns
+str(Stores)
+```
+
+```{r}
+#Separating the dates into other new columns i.e shipping day, month or year
+Stores=Stores %>% 
+  separate(col="Order.Date", 
+           into=c("Order.Day", "Order.Month","Order.Year"),
+           sep="[-/]", remove = FALSE)
+
+Stores=Stores %>% 
+  separate(col="Ship.Date",
+           into=c("Ship.Day","Ship.Month","Ship.Year"),
+           sep="[-/]", remove = FALSE)
+
+```
+
+```{r}
+#converting a few columns into the necessary wanted datatypes
+Stores$Order.Day=as.integer(Stores$Order.Day)
+Stores$Order.Month=as.integer(Stores$Order.Month)
+Stores$Order.Year=as.integer(Stores$Order.Year)
+Stores$Ship.Day=as.integer(Stores$Ship.Day)
+Stores$Ship.Month=as.integer(Stores$Order.Month)
+Stores$Ship.Year=as.integer(Stores$Ship.Year)
+Stores$Ship.Mode=as.factor(Stores$Ship.Mode)
+Stores$Category=as.factor(Stores$Category)
+Stores$Order.Priority =as.factor(Stores$Order.Priority)
+Stores$Ship.Month=as.character(Stores$Order.Month)
+Stores$Order.Month=as.character(Stores$Order.Month)
+```
+
+
+```{r}
+#renaming the months into the expected
+Stores=Stores %>% 
+  mutate(
+    Order.Month =case_when(Order.Month == 1 ~ "January",Order.Month == 2 ~ "February",
+                         Order.Month == 3 ~ "March",Order.Month == 4 ~ "April",
+                         Order.Month == 5 ~ "May",Order.Month == 6 ~ "June",
+                         Order.Month == 7 ~ "July",Order.Month == 8 ~ "August",
+                         Order.Month == 9 ~ "September",Order.Month == 10 ~ "October",
+                         Order.Month == 11 ~ "November",Order.Month == 12 ~ "December"))
+
+Stores=Stores %>% 
+  mutate(
+    Ship.Month =case_when(Ship.Month == 1 ~ "January",Ship.Month == 2 ~ "February",
+                         Ship.Month == 3 ~ "March",Ship.Month == 4 ~ "April",
+                         Ship.Month == 5 ~ "May",Ship.Month == 6 ~ "June",
+                         Ship.Month == 7 ~ "July",Ship.Month == 8 ~ "August",
+                         Ship.Month == 9 ~ "September",Ship.Month == 10 ~ "October",
+                         Ship.Month == 11 ~ "November",Ship.Month == 12 ~ "December"))
+
+```
+
+```{r}
+#checking the datatypes again
+str(Stores)
+```
+
+Working on the date columns
+
+```{r}
+#lets now get the summary for our dataset
+summary(Stores)
+```
+		Perform an Exploratory Data Analysis
+ Customers Analysis		
+1.Profile the customers based on their frequency of purchase - calculate frequency of purchase for each customer
+```{r}
+freq_purch=Stores %>% 
+  select(Customer.ID, Customer.Name) %>% 
+  group_by(Customer.Name) %>% 
+  summarise(Frequency=n()) %>% 
+  arrange(Frequency, by_group = TRUE)
+
+Most_frequent_customers=tail(freq_purch,5)
+```
+
+2.Do the high frequent customers are contributing more revenue	
+```{r}
+Stores %>% 
+  select(Customer.ID, Customer.Name, Sales) %>% 
+  group_by(Customer.Name) %>%
+  summarise(Total_sales=sum(Sales),Frequency=n()) %>% 
+  arrange(desc(Total_sales),desc(Frequency)) %>% 
+  head(5)
+
+```
+NO.The frequent customers do not contribute much to the revenue
+
+3.Are they also profitable - what is the profit margin across the buckets		
+```{r}
+Stores %>% 
+  select(Customer.ID, Customer.Name, Profit) %>% 
+  group_by(Customer.Name) %>%
+  summarise(Total_Profits=sum(Profit),Frequency=n()) %>% 
+  arrange(desc(Total_Profits),desc(Frequency)) %>% 
+  head(5)
+```
+
+
+4.Which customer segment is most profitable in each year.	
+```{r}
+segment_customer= Stores %>% 
+  select(Segment, Profit) %>% 
+  group_by(Segment) %>% 
+  summarise(Total_Profits=ceiling(sum(Profit))) %>% 
+  arrange(desc(Total_Profits))
+
+pie(segment_customer$Total_Profits,
+    labels =NA,
+    lwd=2,
+    main = "Profits per Segment",
+    border="white",
+    col = c("red","blue","green",
+    cex.main =1.5
+    ))
+
+legend("topright", legend=segment_customer$Segment,fill = c("red","blue","green", title = "Segments"))
+```
+
+5.How are the customers distributed across the countries?		
+```{r}
+dist_Country=Stores %>% 
+  select(Country) %>% 
+  group_by(Country) %>% 
+  summarise(Frequency=n())
+```
+
+Product Analysis		
+1.Which country has top sales?	
+```{r}
+c_top=Stores %>%
+  select(Country, Sales) %>% 
+  group_by(Country) %>% 
+  summarise(Total_Sales=sum(Sales)) %>% 
+  arrange(desc(Total_Sales)) %>% 
+  head(5)
+
+ggplot(c_top, aes(x=Country, y=Total_Sales))+
+  geom_bar(stat="identity",col="black",fill=c("red","yellow","green","blue","pink"))+
+  labs(title = "Investigating the country with the most sales", x="Countries",y="Total Sales")+
+  theme_minimal()+
+  scale_fill_manual()+
+  theme(plot.title = element_text(hjust=0.5))
+  
+```
+
+2.Which are the top 5 profit-making product types on a yearly basis?	
+```{r}
+profit_product <- 
+  rbind(
+  (Stores %>% 
+  select(Ship.Year, Sub.Category, Profit) %>% 
+  filter(Ship.Year == 2011) %>% 
+  group_by(Ship.Year,Sub.Category) %>% 
+  summarise(Total_profits = ceiling(sum(Profit)), .groups = 'drop') %>% 
+  arrange(desc(Total_profits)) %>% 
+  head(5)),
+  (Stores %>% 
+  select(Ship.Year, Sub.Category, Profit) %>% 
+  filter(Ship.Year == 2012) %>% 
+  group_by(Ship.Year,Sub.Category) %>% 
+  summarise(Total_profits = ceiling(sum(Profit)), .groups = 'drop') %>% 
+  arrange(desc(Total_profits)) %>% 
+  head(5)),
+  (Stores %>% 
+  select(Ship.Year, Sub.Category, Profit) %>% 
+  filter(Ship.Year == 2013) %>% 
+  group_by(Ship.Year,Sub.Category) %>% 
+  summarise(Total_profits = ceiling(sum(Profit)), .groups = 'drop') %>% 
+  arrange(desc(Total_profits)) %>% 
+  head(5)),
+  (Stores %>% 
+  select(Ship.Year, Sub.Category, Profit) %>% 
+  filter(Ship.Year == 2014) %>% 
+  group_by(Ship.Year,Sub.Category) %>% 
+  summarise(Total_profits = ceiling(sum(Profit)), .groups = 'drop') %>% 
+  arrange(desc(Total_profits)) %>% 
+  head(5)),
+  (Stores %>% 
+  select(Ship.Year, Sub.Category, Profit) %>% 
+  filter(Ship.Year == 2015) %>% 
+  group_by(Ship.Year,Sub.Category) %>% 
+  summarise(Total_profits = ceiling(sum(Profit)), .groups = 'drop') %>% 
+  arrange(desc(Total_profits)) %>% 
+  head(5)))
+  
+ggplot(profit_product, aes(x=Ship.Year, y=Total_profits, fill=Sub.Category))+
+  geom_bar(stat = "identity", position = "dodge")+
+  labs(title = "Total Profits per year and product", x= "Year", y= "Total Profits")+
+  theme_minimal()+
+  theme(plot.title = element_text(hjust = 0.5))+
+  scale_fill_manual(values = c("red","blue","green","black","purple","orange","brown"))
+
+```
+
+
+3.How is the product price varying with sales - Is there any increase in sales with the decrease in price at any level?
+```{r}
+
+```
+
+4.What is the average delivery time across the countries?
+
+5.What is the profit by month? (Use a line chart to visualize this.)	
+```{r}
+profit_month=Stores %>% 
+  select(Order.Month, Profit) %>% 
+  group_by(Order.Month) %>% 
+  summarise(Total_Profits=ceiling(sum(Profit)))
+
+profit_month$Order.Month <- factor(profit_month$Order.Month, levels = month.name)
+
+ggplot(profit_month, aes(x = Order.Month, y = Total_Profits, group=1)) +
+  geom_line(color = "blue", linewidth = 1.5) + 
+  labs(title = "Total Profit by Month", x = "Month", y = "Total Profit") +
+  theme_minimal() + 
+  theme(
+    plot.title = element_text(hjust = 0.5),  
+    axis.text.x = element_text(angle = 45, hjust = 1)
+  )
+```
+6.Profit by category? By Subcategory?		
+```{r}
+profit_category=Stores %>% 
+  select(Category, Profit) %>% 
+  group_by(Category) %>% 
+  summarise(Total_Profits=ceiling(sum(Profit)))
+
+profit_subcategory=Stores %>% 
+  select(Sub.Category, Profit) %>% 
+  group_by(Sub.Category) %>% 
+  summarise(Total_Profits=ceiling(sum(Profit)))
+
+print(profit_subcategory)
+
+
+pie(profit_category$Total_Profits, 
+    labels = profit_category$Category,
+    lwd=2,
+    main="Profits per Category",
+    col=c("red", "blue","pink"),
+    border = "white",  # Add white border around each slice
+  lwd = 2,  # Increase line width for slice outlines
+  clockwise = TRUE,  # Change the direction of the slices to clockwise
+  init.angle = 90,  # Start drawing slices from the top (90 degrees)
+  cex.main = 1.5,  # Increase the size of the main title
+  cex.lab = 1.2,   # Increase the size of the labels
+  cex.axis = 0.8   # Adjust the size of the axis text
+  )
+
+legend("topright", legend=profit_category$Category, fill=c("red","blue","green"), title="Categories")
+```
+7.Sales by month? By category? By subcategory?		
+
+```{r}
+sales_month=Stores %>% 
+  select(Order.Month, Sales) %>% 
+  group_by(Order.Month) %>% 
+  summarise(Total_Sales=ceiling(sum(Sales)))
+
+sales_month$Order.Month <- factor(sales_month$Order.Month, levels = month.name)
+
+sales_category=Stores %>% 
+  select(Category, Sales) %>% 
+  group_by(Category) %>% 
+  summarise(Total_Sales=ceiling(sum(Sales)))
+
+sales_subcategory=Stores %>% 
+  select(Sub.Category, Sales) %>% 
+  group_by(Sub.Category) %>% 
+  summarise(Total_Sales=ceiling(sum(Sales)))
+
+print(sales_subcategory)
+
+pie(sales_category$Total_Sales,
+    labels = NA,
+    lwd=2,
+    main="Sales per Category",
+    col=c("red","blue","green"),
+    border = "white",
+    cex.main=1.5
+    )
+
+legend("topright", legend = sales_category$Category, fill = c("red","blue","green"), title = "Categories")
+
+ggplot(sales_month, aes(x=Order.Month, y= Total_Sales))+
+  geom_bar(stat="identity", col="black", fill="blue")+
+  labs(title = "Total Sales per Month", x= "Months", y="Total Sales")+
+  theme_minimal()+
+  theme(
+    plot.title = element_text(hjust=0.5),
+    axis.text.x = element_text(angle = 45, hjust=1)
+  )
+```
